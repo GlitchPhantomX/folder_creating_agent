@@ -26,7 +26,7 @@ def create_folder(folder_name: str) -> str:
             if os.path.isdir(folder_path):
                 return f"✅ Successfully created folder at:\n{folder_path}"
             return f"❌ Error: Folder creation failed (permissions issue?)"
-        return f"⚠️ Folder already exists at:\n{folder_path}"
+        return f"⚠ Folder already exists at:\n{folder_path}"
     except Exception as e:
         return f"❌ Error creating folder: {str(e)}"
 
@@ -51,7 +51,7 @@ def create_file(file_path: str, content: str = "") -> str:
 @function_tool
 def generate_code(instruction: str) -> str:
     """Generates code based on user instruction"""
-    return f"CODE_REQUEST:{instruction}"
+    return instruction  # simplified - no CODE_REQUEST
 
 @function_tool
 def list_files(folder_path: str = "") -> str:
@@ -93,11 +93,23 @@ async def start():
     
     agent = Agent(
         name="FileCoderPro",
-        instructions="""You are an advanced file management assistant that can:
-1. Create and manage folders/files in the current directory
-2. Generate code for applications
-3. List directory contents
-Always verify operations and provide detailed status reports. and use emojis for better user experience.""",
+        instructions="""
+You are FileCoderPro — an expert file manager and code generator.
+
+You can:
+1. Create folders and files in the working directory.
+2. Generate complete, production-ready HTML, CSS, and JavaScript code.
+3. Automatically save the generated code to proper files using create_file tool.
+4. Use modern best practices, include comments, and ensure mobile responsiveness.
+
+When the user gives a full instruction like 'Create a folder named todo_app and inside generate index.html, style.css, app.js with proper content', do the following:
+- Create the folder
+- Create each file with full content
+- Save content using the correct tools
+- Always return emoji feedback ✅ or ❌ with paths or summaries
+
+NEVER ask the user to save manually. Handle all saving internally.
+        """,
         model=model,
         tools=[create_folder, create_file, generate_code, list_files]
     )
@@ -119,18 +131,8 @@ async def main(message: cl.Message):
     try:
         result = Runner.run_sync(agent, history, run_config=config)
         response_content = result.final_output
-        
-        if response_content.startswith("CODE_REQUEST:"):
-            code_request = response_content.split(":", 1)[1].strip()
-            code_response = await agent.model.run([{"role": "user", "content": f"Generate complete, production-ready code for: {code_request}. Include all necessary files and instructions."}])
-            generated_code = code_response.choices[0].message.content
-            
-            response_content = f"""💻 Code Generated for '{code_request}':
-            
-{generated_code}
 
-Reply with 'save this as filename.js' to store it."""
-        
+        # Directly respond
         if "❌ Error" in response_content:
             msg.content = f"❌ {response_content}"
         elif "✅" in response_content:
@@ -147,7 +149,7 @@ Reply with 'save this as filename.js' to store it."""
         await msg.update()
         print(f"Error: {str(e)}")
 
-if __name__ == "__main__":
+if __name__ == "_main_":
     current_dir = os.getcwd()
     print(f"Debug: Current working directory is {current_dir}")
     print(f"Debug: Directory contents: {os.listdir(current_dir)}")
